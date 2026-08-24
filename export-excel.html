@@ -5,40 +5,53 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Экспорт Cashflow в Excel</title>
 <style>
-:root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#e8eef7;background:#07111f}
-*{box-sizing:border-box}body{margin:0;background:#07111f;color:#e8eef7}.wrap{max-width:760px;margin:60px auto;padding:24px}.card{background:#0c1929;border:1px solid #1c2e43;border-radius:14px;padding:24px}.muted{color:#8293a8}.btn{border:0;background:#2b6df3;color:#fff;border-radius:9px;padding:11px 15px;font-weight:700;cursor:pointer}.back{color:#8fb3ff;text-decoration:none;font-size:13px}.note{margin:16px 0;padding:12px 14px;border-radius:10px;background:#101f32;color:#9fb2c9;font-size:13px}.status{margin-top:14px;font-size:13px}
+:root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#e8eef7;background:#07111f}*{box-sizing:border-box}body{margin:0;background:#07111f;color:#e8eef7}.wrap{max-width:820px;margin:60px auto;padding:24px}.card{background:#0c1929;border:1px solid #1c2e43;border-radius:14px;padding:24px}.muted{color:#8293a8}.btn{border:0;background:#2b6df3;color:#fff;border-radius:9px;padding:11px 15px;font-weight:700;cursor:pointer}.back{color:#8fb3ff;text-decoration:none;font-size:13px}.note{margin:16px 0;padding:12px 14px;border-radius:10px;background:#101f32;color:#9fb2c9;font-size:13px}.status{margin-top:14px;font-size:13px}
 </style>
 </head>
 <body><div class="wrap"><div class="card">
 <a class="back" href="index.html">← Назад в Europe Cashflow Planner</a>
-<h1>Экспорт доходов и расходов в Excel</h1>
-<p class="muted">Выгружаются все сохранённые операции из Europe Cashflow Planner. Суммы в EUR дополнительно приводятся к USD по текущему курсу из настроек.</p>
-<div class="note">Файл открывается в Microsoft Excel как обычная таблица. В выгрузку входят: статус, название, тип, категория, тип расчёта, сумма, валюта, USD-эквивалент, повторяемость, даты, сценарий и комментарий.</div>
-<button id="download" class="btn">Скачать Excel</button>
+<h1>Экспорт доходов и расходов</h1>
+<p class="muted">Выгрузка формируется как настоящая табличная CSV-структура, которую Excel открывает по отдельным строкам и колонкам.</p>
+<div class="note">Первая строка — заголовки таблицы. Каждая операция — отдельная строка. Суммы в EUR дополнительно пересчитываются в USD по текущему курсу из настроек.</div>
+<button id="download" class="btn">Скачать таблицу для Excel</button>
 <div id="status" class="status muted"></div>
 </div></div>
 <script>
 const K='cashflow-europe-planner-v1';
 const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const freq={'one-time':'Одноразово',daily:'Ежедневно',weekly:'Еженедельно',monthly:'Ежемесячно',quarterly:'Ежеквартально',annual:'Ежегодно'};
 const scen={all:'Все сценарии',base:'Базовый',downside:'Негативный',upside:'Позитивный'};
 function load(){try{return JSON.parse(localStorage.getItem(K)||'null')}catch{return null}}
 function toUsd(n,c,rate){return c==='EUR'?(+n||0)*rate:(+n||0)}
-function excelCell(v){return `<td>${esc(v)}</td>`}
+function csv(v){v=String(v??'').replace(/"/g,'""');return '"'+v+'"'}
 function downloadExcel(){
  const state=load();
  if(!state){$('status').textContent='Данные Europe Cashflow Planner в этом браузере не найдены.';return}
  const rate=+(state.settings?.eurUsd||1);
+ const header=['Включена','Название','Тип','Категория','Тип расчёта','Значение','Валюта','USD эквивалент','Повторяемость','Дата начала','Дата окончания','Сценарий','Комментарий'];
  const rows=(state.cashflows||[]).map(c=>{
    const pct=c.amountType==='revenue-percent';
-   const usd=pct?'Авто: % от выручки':toUsd(c.amount,c.currency||'USD',rate).toFixed(2);
-   return `<tr>${excelCell(c.enabled===false?'Нет':'Да')}${excelCell(c.name)}${excelCell(c.direction==='income'?'Доход':'Расход')}${excelCell(c.category||'')}${excelCell(pct?'% от выручки':'Фиксированная сумма')}${excelCell(c.amount)}${excelCell(pct?'%':(c.currency||'USD'))}${excelCell(usd)}${excelCell(freq[c.frequency]||c.frequency||'')}${excelCell(c.start||'')}${excelCell(c.end||'')}${excelCell(scen[c.scenario]||c.scenario||'')}${excelCell(c.notes||'')}</tr>`
- }).join('');
- const html=`<html><head><meta charset="utf-8"></head><body><table border="1"><tr><th colspan="13">Europe Cashflow Planner — Доходы и расходы</th></tr><tr><td colspan="13">Курс EUR → USD: ${rate}</td></tr><tr><th>Включена</th><th>Название</th><th>Тип</th><th>Категория</th><th>Тип расчёта</th><th>Значение</th><th>Валюта</th><th>USD эквивалент</th><th>Повторяемость</th><th>Дата начала</th><th>Дата окончания</th><th>Сценарий</th><th>Комментарий</th></tr>${rows}</table></body></html>`;
- const blob=new Blob(['\ufeff',html],{type:'application/vnd.ms-excel;charset=utf-8'});
- const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cashflow-europe-income-expenses-'+new Date().toISOString().slice(0,10)+'.xls';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
- $('status').textContent=`Готово: выгружено ${(state.cashflows||[]).length} операций.`;
+   return [
+    c.enabled===false?'Нет':'Да',
+    c.name||'',
+    c.direction==='income'?'Доход':'Расход',
+    c.category||'',
+    pct?'% от выручки':'Фиксированная сумма',
+    +c.amount||0,
+    pct?'%':(c.currency||'USD'),
+    pct?'Авто':toUsd(c.amount,c.currency||'USD',rate).toFixed(2),
+    freq[c.frequency]||c.frequency||'',
+    c.start||'',c.end||'',
+    scen[c.scenario]||c.scenario||'',
+    c.notes||''
+   ];
+ });
+ const meta=[['Europe Cashflow Planner — Доходы и расходы'],['Курс EUR → USD',rate],[]];
+ const all=[...meta,header,...rows];
+ const text='\ufeff'+all.map(r=>r.map(csv).join(',')).join('\r\n');
+ const blob=new Blob([text],{type:'text/csv;charset=utf-8'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='cashflow-europe-income-expenses-'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ $('status').textContent=`Готово: выгружено ${(state.cashflows||[]).length} операций. Файл откроется в Excel как таблица.`;
 }
 $('download').onclick=downloadExcel;
 </script></body></html>
